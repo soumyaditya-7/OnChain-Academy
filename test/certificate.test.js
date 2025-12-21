@@ -1,0 +1,55 @@
+const { expect } = require('chai');
+const { ethers } = require('hardhat');
+
+describe('Certificate + Marketplace integration', function () {
+  let Certificate, certificate, Marketplace, marketplace, owner, buyer, other;
+
+  beforeEach(async function () {
+    [owner, buyer, other] = await ethers.getSigners();
+
+    Certificate = await ethers.getContractFactory('CertificateNFT');
+    certificate = await Certificate.connect(owner).deploy('ArbiLearn Certificate', 'ALC');
+    await certificate.deployed();
+
+    Marketplace = await ethers.getContractFactory('CourseMarketplace');
+    marketplace = await Marketplace.connect(owner).deploy(certificate.address, owner.address);
+    await marketplace.deployed();
+
+    // allow marketplace to mint certificates
+    await certificate.connect(owner).setIssuer(marketplace.address, true);
+  });
+
+  it('allows purchase and issues certificate', async function () {
+    const courseId = 1;
+    const price = ethers.parseEther('0.01');
+
+    // add course
+    await marketplace.connect(owner).addCourse(courseId, price, owner.address);
+
+    // buy course
+    await expect(
+      marketplace.connect(buyer).purchaseCourse(courseId, { value: price })
+    ).to.emit(marketplace, 'CoursePurchased').withArgs(buyer.address, courseId, price);
+
+    const purchased = await marketplace.purchased(buyer.address, courseId);
+    expect(purchased).to.equal(true);
+
+    // issue certificate
+    const uri = 'ipfs://QmCertMetadataCID';
+    await expect(
+      marketplace.connect(owner).issueCertificate(buyer.address, courseId, uri)
+    ).to.emit(marketplace, 'CertificateIssued');
+
+    // tokenId 1 should be owned by buyer
+    expect(await certificate.ownerOf(1)).to.equal(buyer.address);
+    expect(await certificate.tokenURI(1)).to.equal(uri);
+    expect(await certificate.tokenCourse(1)).to.equal(courseId);
+  });
+
+  it('prevents unauthorized minting', async function () {
+    const uri = 'ipfs://unauthorized';
+    await expect(certificate.connect(other).mintCertificate(other.address, uri, 99)).to.be.revertedWith(
+      'Not authorized to mint'
+    );
+  });
+});
