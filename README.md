@@ -1,4 +1,4 @@
-# ArbiLearn - Web3 Learning Platform
+# OnChain Academy - Web3 Learning Platform
 
 A decentralized learning platform built on the Arbitrum blockchain, enabling users to learn blockchain development while earning NFT certificates and on-chain credentials.
 
