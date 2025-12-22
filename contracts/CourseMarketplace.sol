@@ -49,14 +49,15 @@ contract CourseMarketplace is Ownable, ReentrancyGuard {
     /// @notice Purchase a course by sending native token (ETH/Arbitrum)
     function purchaseCourse(uint256 courseId) external payable nonReentrant {
         Course memory c = courses[courseId];
+        require(c.creator != address(0), "Course does not exist");
         require(c.active, "Course not available");
         require(msg.value >= c.price, "Insufficient payment");
         require(!purchased[msg.sender][courseId], "Already purchased");
 
         purchased[msg.sender][courseId] = true;
 
-        // Keep funds in contract treasury; owner can withdraw
-        (bool sent, ) = payable(treasury).call{value: msg.value}("{}");
+        // Forward funds to treasury
+        (bool sent, ) = payable(treasury).call{value: msg.value}("");
         require(sent, "Transfer failed");
 
         emit CoursePurchased(msg.sender, courseId, msg.value);
@@ -74,6 +75,7 @@ contract CourseMarketplace is Ownable, ReentrancyGuard {
 
     /// @notice Update treasury address
     function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "Invalid treasury");
         treasury = _treasury;
     }
 
@@ -86,7 +88,7 @@ contract CourseMarketplace is Ownable, ReentrancyGuard {
     /// @notice Withdraw accidental stuck funds from the contract
     function withdraw(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "Invalid recipient");
-        (bool sent, ) = payable(to).call{value: amount}("{}");
+        (bool sent, ) = payable(to).call{value: amount}("");
         require(sent, "Withdraw failed");
     }
 }

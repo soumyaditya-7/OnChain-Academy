@@ -29,19 +29,30 @@ import {
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
+import { useAccount, useDisconnect } from 'wagmi'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [walletAddress] = useState("0x742d35Ef8b7Bc3a9F")
+  const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
   const [copiedAddress, setCopiedAddress] = useState(false)
 
+  // Redirect if not connected
+  if (!isConnected) {
+    router.push('/')
+    return null
+  }
+
   const copyAddress = () => {
-    navigator.clipboard.writeText(walletAddress)
-    setCopiedAddress(true)
-    setTimeout(() => setCopiedAddress(false), 2000)
+    if (address) {
+      navigator.clipboard.writeText(address)
+      setCopiedAddress(true)
+      setTimeout(() => setCopiedAddress(false), 2000)
+    }
   }
 
   const disconnectWallet = () => {
+    disconnect()
     router.push("/")
   }
 
@@ -156,13 +167,13 @@ export default function DashboardPage() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="border-primary/50 text-foreground bg-transparent">
                   <div className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-sm border-primary/30">
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium">Connected Wallet</p>
-                  <p className="text-xs text-muted-foreground font-mono">{walletAddress}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{address}</p>
                 </div>
                 <DropdownMenuSeparator className="bg-primary/20" />
                 <DropdownMenuItem onClick={copyAddress} className="cursor-pointer">
@@ -170,7 +181,7 @@ export default function DashboardPage() {
                   Copy Address
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer">
-                  <a href={`https://arbiscan.io/address/${walletAddress}`} target="_blank" rel="noopener noreferrer">
+                  <a href={`https://arbiscan.io/address/${address}`} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="mr-2 h-4 w-4" />
                     View on Arbiscan
                   </a>
@@ -202,7 +213,7 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="text-sm text-muted-foreground mb-2">Connected Wallet</h3>
                   <div className="flex items-center gap-2">
-                    <code className="text-lg font-mono">{walletAddress}</code>
+                    <code className="text-lg font-mono">{address}</code>
                     <Button size="sm" variant="ghost" onClick={copyAddress} className="h-8 w-8 p-0 hover:bg-primary/20">
                       {copiedAddress ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
                     </Button>
@@ -219,7 +230,7 @@ export default function DashboardPage() {
                 className="border-primary/50 hover:bg-primary/10 bg-transparent"
                 asChild
               >
-                <a href={`https://arbiscan.io/address/${walletAddress}`} target="_blank" rel="noopener noreferrer">
+                <a href={`https://arbiscan.io/address/${address}`} target="_blank" rel="noopener noreferrer">
                   View on Arbiscan
                   <ExternalLink className="ml-2 h-3 w-3" />
                 </a>
@@ -399,23 +410,21 @@ export default function DashboardPage() {
                   {leaderboard.map((user, index) => (
                     <div
                       key={index}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        user.isCurrentUser
-                          ? "bg-primary/20 border border-primary/50"
-                          : "bg-card/30 border border-transparent"
-                      }`}
+                      className={`flex items-center justify-between p-3 rounded-lg ${user.isCurrentUser
+                        ? "bg-primary/20 border border-primary/50"
+                        : "bg-card/30 border border-transparent"
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                            user.rank === 1
-                              ? "bg-yellow-500/20 text-yellow-400"
-                              : user.rank === 2
-                                ? "bg-gray-400/20 text-gray-300"
-                                : user.isCurrentUser
-                                  ? "bg-primary/30 text-primary"
-                                  : "bg-muted/50 text-muted-foreground"
-                          }`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${user.rank === 1
+                            ? "bg-yellow-500/20 text-yellow-400"
+                            : user.rank === 2
+                              ? "bg-gray-400/20 text-gray-300"
+                              : user.isCurrentUser
+                                ? "bg-primary/30 text-primary"
+                                : "bg-muted/50 text-muted-foreground"
+                            }`}
                         >
                           #{user.rank}
                         </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,20 +25,55 @@ import {
   LogOut,
   ExternalLink,
   Copy,
-  ShoppingCart
+  ShoppingCart,
+  Loader2
 } from "lucide-react"
 import { motion } from "framer-motion"
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useToast } from "@/hooks/use-toast"
 
 import { courses } from "@/lib/data"
+import { CONTRACT_ADDRESSES, courseMarketplaceAbi, parseEthPrice, COURSE_ID_MAP } from "@/lib/contracts"
 
 export default function CoursesPage() {
   const { address, isConnected } = useAccount()
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
+  const { toast } = useToast()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [levelFilter, setLevelFilter] = useState("all")
+  const [buyingCourseId, setBuyingCourseId] = useState<string | null>(null)
+
+  // Write contract hook for purchasing
+  const { data: txHash, writeContract, isPending, error: writeError } = useWriteContract()
+
+  // Wait for transaction confirmation
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash: txHash,
+  })
+
+  // Handle transaction status changes
+  useEffect(() => {
+    if (isConfirmed && buyingCourseId) {
+      toast({
+        title: "Purchase Successful!",
+        description: "You now have access to this course. Start learning!",
+      })
+      setBuyingCourseId(null)
+    }
+  }, [isConfirmed, buyingCourseId, toast])
+
+  useEffect(() => {
+    if (writeError) {
+      toast({
+        title: "Transaction Failed",
+        description: writeError.message.slice(0, 100),
+        variant: "destructive",
+      })
+      setBuyingCourseId(null)
+    }
+  }, [writeError, toast])
 
   const handleConnect = () => {
     const metamask = connectors.find((c) => c.name === 'MetaMask')
@@ -50,8 +85,27 @@ export default function CoursesPage() {
     if (address) navigator.clipboard.writeText(address)
   }
 
-  const handleBuy = (courseTitle: string, price: string) => {
-    alert(`Buying ${courseTitle} for ${price}`)
+  const handleBuy = (courseId: string, price: string) => {
+    const onChainCourseId = COURSE_ID_MAP[courseId]
+    if (!onChainCourseId) {
+      toast({
+        title: "Course Not Available",
+        description: "This course is not yet available for purchase on-chain.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const priceWei = parseEthPrice(price)
+    setBuyingCourseId(courseId)
+
+    writeContract({
+      address: CONTRACT_ADDRESSES.courseMarketplace as `0x${string}`,
+      abi: courseMarketplaceAbi,
+      functionName: 'purchaseCourse',
+      args: [BigInt(onChainCourseId)],
+      value: priceWei,
+    })
   }
 
   const filteredCourses = courses.filter((course) => {
@@ -318,11 +372,15 @@ export default function CoursesPage() {
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => handleBuy(course.title, course.price)}
+                            onClick={() => handleBuy(course.id, course.price)}
+                            disabled={isPending || isConfirming || buyingCourseId === course.id}
                             className="flex-[2] bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0"
                           >
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            Buy Now
+                            {(isPending || isConfirming) && buyingCourseId === course.id ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing...</>
+                            ) : (
+                              <><ShoppingCart className="w-4 h-4 mr-2" />Buy Now</>
+                            )}
                           </Button>
                         )}
                       </>

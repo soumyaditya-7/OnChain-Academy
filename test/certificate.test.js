@@ -3,20 +3,23 @@ const { ethers } = require('hardhat');
 
 describe('Certificate + Marketplace integration', function () {
   let Certificate, certificate, Marketplace, marketplace, owner, buyer, other;
+  let certAddress, marketplaceAddress;
 
   beforeEach(async function () {
     [owner, buyer, other] = await ethers.getSigners();
 
     Certificate = await ethers.getContractFactory('CertificateNFT');
     certificate = await Certificate.connect(owner).deploy('ArbiLearn Certificate', 'ALC');
-    await certificate.deployed();
+    await certificate.waitForDeployment();
+    certAddress = await certificate.getAddress();
 
     Marketplace = await ethers.getContractFactory('CourseMarketplace');
-    marketplace = await Marketplace.connect(owner).deploy(certificate.address, owner.address);
-    await marketplace.deployed();
+    marketplace = await Marketplace.connect(owner).deploy(certAddress, owner.address);
+    await marketplace.waitForDeployment();
+    marketplaceAddress = await marketplace.getAddress();
 
     // allow marketplace to mint certificates
-    await certificate.connect(owner).setIssuer(marketplace.address, true);
+    await certificate.connect(owner).setIssuer(marketplaceAddress, true);
   });
 
   it('allows purchase and issues certificate', async function () {
@@ -51,5 +54,19 @@ describe('Certificate + Marketplace integration', function () {
     await expect(certificate.connect(other).mintCertificate(other.address, uri, 99)).to.be.revertedWith(
       'Not authorized to mint'
     );
+  });
+
+  it('prevents certificate transfer (soulbound)', async function () {
+    const courseId = 2;
+    const price = ethers.parseEther('0.01');
+
+    await marketplace.connect(owner).addCourse(courseId, price, owner.address);
+    await marketplace.connect(buyer).purchaseCourse(courseId, { value: price });
+    await marketplace.connect(owner).issueCertificate(buyer.address, courseId, 'ipfs://test');
+
+    // Attempt transfer should revert
+    await expect(
+      certificate.connect(buyer).transferFrom(buyer.address, other.address, 1)
+    ).to.be.revertedWith('Certificates are soulbound');
   });
 });
