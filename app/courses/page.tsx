@@ -29,7 +29,7 @@ import {
   Loader2
 } from "lucide-react"
 import { motion } from "framer-motion"
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt, useReadContracts } from 'wagmi'
 import { useToast } from "@/hooks/use-toast"
 
 import { courses } from "@/lib/data"
@@ -52,6 +52,32 @@ export default function CoursesPage() {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash: txHash,
   })
+
+  // Check ownership of all courses
+  const { data: ownershipData, refetch: refetchOwnership } = useReadContracts({
+    contracts: courses.map((course) => ({
+      address: CONTRACT_ADDRESSES.courseMarketplace as `0x${string}`,
+      abi: courseMarketplaceAbi,
+      functionName: 'purchased',
+      args: [address || '0x0000000000000000000000000000000000000000', BigInt(COURSE_ID_MAP[course.id] || 0)],
+    })),
+    query: {
+      enabled: !!address,
+    }
+  })
+
+  // Refresh ownership after successful purchase
+  useEffect(() => {
+    if (isConfirmed) {
+      refetchOwnership()
+    }
+  }, [isConfirmed, refetchOwnership])
+
+  const isOwned = (courseId: string) => {
+    const index = courses.findIndex(c => c.id === courseId)
+    if (index === -1 || !ownershipData || !ownershipData[index]) return false
+    return !!ownershipData[index].result
+  }
 
   // Handle transaction status changes
   useEffect(() => {
@@ -369,6 +395,15 @@ export default function CoursesPage() {
                           >
                             <Wallet className="w-4 h-4 mr-2" />
                             Buy
+                          </Button>
+                        ) : isOwned(course.id) ? (
+                          <Button
+                            variant="secondary"
+                            disabled
+                            className="flex-[2] bg-green-500/20 text-green-500 border-green-500/50"
+                          >
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Owned
                           </Button>
                         ) : (
                           <Button

@@ -1,4 +1,6 @@
 // Contract addresses - update these after deployment
+import { parseEther } from 'viem'
+
 export const CONTRACT_ADDRESSES = {
     certificateNFT: process.env.NEXT_PUBLIC_CERTIFICATE_NFT_ADDRESS || '0x0000000000000000000000000000000000000000',
     courseMarketplace: process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS || '0x0000000000000000000000000000000000000000',
@@ -88,8 +90,7 @@ export function parseEthPrice(priceString: string): bigint {
     if (priceString === 'Free') return BigInt(0)
     const match = priceString.match(/^([\d.]+)\s*ETH$/i)
     if (!match) return BigInt(0)
-    const ethValue = parseFloat(match[1])
-    return BigInt(Math.floor(ethValue * 1e18))
+    return parseEther(match[1])
 }
 
 // Course ID mapping (string ID to on-chain number)
