@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChevronLeft, Shield, Award, Sparkles, CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
+import { CONTRACT_ADDRESSES, courseMarketplaceAbi, COURSE_ID_MAP } from "@/lib/contracts"
+import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
 
@@ -19,7 +22,16 @@ export default function QuizPage() {
   const router = useRouter()
   const courseId = params.id as string
 
-  const [walletAddress] = useState("0x742d...3a9F")
+  const { address } = useAccount()
+  const { toast } = useToast()
+  const walletAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not Connected"
+  
+  // Certificate minting hooks
+  const { data: mintTxHash, writeContract, isPending: isMintPending, error: mintError } = useWriteContract()
+  const { isLoading: isMintConfirming, isSuccess: isMintSuccess } = useWaitForTransactionReceipt({
+    hash: mintTxHash,
+  })
+
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [showResults, setShowResults] = useState(false)
@@ -102,11 +114,9 @@ export default function QuizPage() {
       }
     }
   }
-
-  const handleMintNFT = async () => {
-    setIsMinting(true)
-    // Simulate minting transaction
-    setTimeout(() => {
+  // Handle mint success
+  useEffect(() => {
+    if (isMintSuccess) {
       setIsMinting(false)
       setMintSuccess(true)
       confetti({
@@ -115,10 +125,48 @@ export default function QuizPage() {
         origin: { y: 0.6 },
         colors: ["#60a5fa", "#a78bfa", "#34d399"],
       })
+      toast({ title: "Certificate Minted!", description: "Your NFT certificate is now on the blockchain." })
       setTimeout(() => {
         router.push("/dashboard")
       }, 3000)
-    }, 3000)
+    }
+  }, [isMintSuccess, router, toast])
+
+  // Handle mint error
+  useEffect(() => {
+    if (mintError) {
+      setIsMinting(false)
+      toast({ 
+        title: "Minting Failed", 
+        description: mintError.message.slice(0, 100),
+        variant: "destructive" 
+      })
+    }
+  }, [mintError, toast])
+
+
+  const handleMintNFT = async () => {
+    if (!address) {
+      toast({ title: "Wallet not connected", variant: "destructive" })
+      return
+    }
+    
+    const onChainCourseId = COURSE_ID_MAP[courseId]
+    if (!onChainCourseId) {
+      toast({ title: "Course not found", variant: "destructive" })
+      return
+    }
+    
+    // Generate certificate metadata URI (in production, upload to IPFS)
+    const tokenURI = `https://arbilearn.xyz/api/certificate/${courseId}/${address}`
+    
+    setIsMinting(true)
+    writeContract({
+      address: CONTRACT_ADDRESSES.courseMarketplace as `0x${string}`,
+      abi: courseMarketplaceAbi,
+      functionName: 'issueCertificate',
+      args: [address, BigInt(onChainCourseId), tokenURI],
+    })
   }
 
   return (

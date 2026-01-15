@@ -83,6 +83,28 @@ export const courseMarketplaceAbi = [
         name: 'CoursePurchased',
         type: 'event',
     },
+    {
+        inputs: [
+            { name: 'to', type: 'address' },
+            { name: 'courseId', type: 'uint256' },
+            { name: 'tokenURI', type: 'string' },
+        ],
+        name: 'issueCertificate',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'nonpayable',
+        type: 'function',
+    },
+    {
+        anonymous: false,
+        inputs: [
+            { indexed: true, name: 'to', type: 'address' },
+            { indexed: true, name: 'tokenId', type: 'uint256' },
+            { indexed: true, name: 'courseId', type: 'uint256' },
+        ],
+        name: 'CertificateIssued',
+        type: 'event',
+    },
+
 ] as const
 
 // Helper to parse ETH price strings like "0.05 ETH" to wei
