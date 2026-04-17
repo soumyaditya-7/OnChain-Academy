@@ -1,6 +1,6 @@
 # OnChain Academy - Web3 Learning Platform
 
-A decentralized learning platform built on the Arbitrum blockchain, enabling users to learn blockchain development while earning NFT certificates and on-chain credentials.
+A decentralized Web3 learning platform built on the Arbitrum blockchain, enabling users to learn blockchain development through interactive courses while earning verifiable NFT certificates and on-chain credentials. Featuring a modern glassmorphism UI with 3D immersive backgrounds.
 
 ---
 
